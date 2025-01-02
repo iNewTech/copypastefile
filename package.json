@@ -9,13 +9,25 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
+  
   "contributes": {
     "commands": [
       {
-        "command": "copypastefile.helloWorld",
-        "title": "Hello World"
+        "command": "copypastefile.copyfile",
+        "title": "Copy Paste"
+      }
+    ]
+  },
+  "menus": {
+    "explorer/context": [
+      {
+        "command": "copypastefile.copyfile",
+        "when": "resourceLangId == yaml || resourceLangId == yml",
+          "group": "2_workspace"
       }
     ]
   },
