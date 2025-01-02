@@ -27,7 +27,14 @@
       {
         "command": "copypastefile.copyfile",
         "when": "resourceLangId == yaml || resourceLangId == yml",
-          "group": "2_workspace"
+        "group": "2_workspace"
+      }
+    ],
+    "editor/context": [
+      {
+        "command": "copypastefile.copyfile",
+        "when": "resourceLangId == yaml || resourceLangId == yml",
+        "group": "2_workspace"
       }
     ]
   },

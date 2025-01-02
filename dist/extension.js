@@ -40,47 +40,33 @@ var vscode2 = __toESM(require("vscode"));
 var vscode = __toESM(require("vscode"));
 var path = __toESM(require("path"));
 var fs = __toESM(require("fs"));
-function copyFile(uri) {
-  const anyFile = uri.fsPath;
-  const anyFileName = path.basename(anyFile);
-  const anyFileDir = path.dirname(anyFile);
-  const anyFileContent = fs.readFileSync(anyFile, "utf8");
-  vscode.window.showInputBox({
-    prompt: `Please enter new file name`,
-    value: anyFileName
-  }).then((newFileName) => {
-    if (newFileName === void 0) {
-      return;
-    } else if (newFileName === "") {
-      vscode.window.showErrorMessage(`Error: Blank file name not allowed`);
-      return;
-    } else if (newFileName === anyFileName) {
-      vscode.window.showErrorMessage(`Error: New file name cannot be same as old file name`);
-      return;
-    } else if (!newFileName.includes(".yaml") && !newFileName.includes(".yml")) {
-      newFileName = newFileName + ".yaml";
-      if (newFileName === anyFileName) {
-        vscode.window.showErrorMessage(`Error: New file name cannot be same as old file name`);
-        return;
-      }
-    }
-    const newFilePath = path.join(anyFileDir, newFileName);
-    fs.writeFileSync(newFilePath, anyFileContent);
-    vscode.workspace.openTextDocument(newFilePath).then((doc) => {
-      vscode.window.showTextDocument(doc);
-    });
-  });
+function getTargetPath(sourcePath) {
+  const dir = path.dirname(sourcePath);
+  const ext = path.extname(sourcePath);
+  const base = path.basename(sourcePath, ext);
+  let counter = 1;
+  let targetPath;
+  do {
+    targetPath = path.join(dir, `${base}_copy${counter}${ext}`);
+    counter++;
+  } while (fs.existsSync(targetPath));
+  return targetPath;
 }
 
 // src/extension.ts
+var import_fs = __toESM(require("fs"));
 function activate(context) {
   console.log('Congratulations, your extension "copypastefile" is now active!');
-  let disposable = vscode2.commands.registerCommand("copypastefile.copyfile", async (uri) => {
-    try {
-      copyFile(uri);
-    } catch (error) {
-      vscode2.window.showErrorMessage(`Error: ${error.message}`);
-    }
+  let disposable = vscode2.commands.registerCommand("copypastefile.copyfile", (uri) => {
+    const sourcePath = uri.fsPath;
+    const targetPath = getTargetPath(sourcePath);
+    import_fs.default.copyFile(sourcePath, targetPath, (err) => {
+      if (err) {
+        vscode2.window.showErrorMessage(`Failed to copy file: ${err.message}`);
+      } else {
+        vscode2.window.showInformationMessage(`File copied to ${targetPath}`);
+      }
+    });
   });
   context.subscriptions.push(disposable);
 }
