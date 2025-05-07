@@ -54,13 +54,13 @@ function getTargetPath(sourcePath) {
 }
 
 // src/extension.ts
-var import_fs = __toESM(require("fs"));
+var fs2 = __toESM(require("fs"));
 function activate(context) {
   console.log('Congratulations, your extension "copypastefile" is now active!');
   let disposable = vscode2.commands.registerCommand("copypastefile.copyfile", (uri) => {
     const sourcePath = uri.fsPath;
     const targetPath = getTargetPath(sourcePath);
-    import_fs.default.copyFile(sourcePath, targetPath, (err) => {
+    fs2.copyFile(sourcePath, targetPath, (err) => {
       if (err) {
         vscode2.window.showErrorMessage(`Failed to copy file: ${err.message}`);
       } else {
