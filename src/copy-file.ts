@@ -4,31 +4,32 @@ import * as fs from "fs";
 
 export default function copyFile(uri: vscode.Uri) {
     
-    const anyFile = uri.fsPath;
-    const anyFileName = path.basename(anyFile);
-    const anyFileDir = path.dirname(anyFile);
-    const anyFileContent = fs.readFileSync(anyFile, 'utf8');
+    const baseFile = uri.fsPath;
+    const baseFileName = path.basename(baseFile);
+    const baseFileNameWithoutExt = path.basename(baseFile, path.extname(baseFile));
+    const baseFileDir = path.dirname(baseFile);
+    const baseFileContent = fs.readFileSync(baseFile, 'utf8');
+    const baseFileExt = path.extname(baseFileName);
     vscode.window.showInputBox({
         prompt: `Please enter new file name`,
-        value: anyFileName
+        value: baseFileName
     }).then((newFileName) => {
         if (newFileName === undefined) {
             return;
         } else if (newFileName === '') {
             vscode.window.showErrorMessage(`Error: Blank file name not allowed`);
             return;
-        } else if (newFileName === anyFileName) {
-            vscode.window.showErrorMessage(`Error: New file name cannot be same as old file name`);
-            return;
-        } else if (!newFileName.includes('.yaml') && !newFileName.includes('.yml')) {
-            newFileName = newFileName + '.yaml';
-            if (newFileName === anyFileName) {
-                vscode.window.showErrorMessage(`Error: New file name cannot be same as old file name`);
-                return;
+        } else if (newFileName === baseFileName || newFileName === baseFileNameWithoutExt) {
+            vscode.window.showErrorMessage(`Error: New file name cannot be same as old file name - ${newFileName}`);
+            newFileName = newFileName + '_copy';
+        } else {
+            // Preserve the original file extension if not already included
+            if (!newFileName.includes('.')) {
+                newFileName = newFileName + baseFileExt;
             }
         }
-        const newFilePath = path.join(anyFileDir, newFileName);
-        fs.writeFileSync(newFilePath, anyFileContent);
+        const newFilePath = path.join(baseFileDir, newFileName);
+        fs.writeFileSync(newFilePath, baseFileContent);
         vscode.workspace.openTextDocument(newFilePath).then(doc => {
             vscode.window.showTextDocument(doc);
         });
@@ -43,7 +44,7 @@ export function getTargetPath(sourcePath: string): string {
     let targetPath: string;
 
     do {
-        targetPath = path.join(dir, `${base}_copy${counter}${ext}`);
+        targetPath = path.join(dir, `${base}_copy_${counter}${ext}`);
         counter++;
     } while (fs.existsSync(targetPath));
 

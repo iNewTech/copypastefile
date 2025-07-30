@@ -40,6 +40,37 @@ var vscode2 = __toESM(require("vscode"));
 var vscode = __toESM(require("vscode"));
 var path = __toESM(require("path"));
 var fs = __toESM(require("fs"));
+function copyFile(uri) {
+  const baseFile = uri.fsPath;
+  const baseFileName = path.basename(baseFile);
+  const baseFileNameWithoutExt = path.basename(baseFile, path.extname(baseFile));
+  const baseFileDir = path.dirname(baseFile);
+  const baseFileContent = fs.readFileSync(baseFile, "utf8");
+  const baseFileExt = path.extname(baseFileName);
+  vscode.window.showInputBox({
+    prompt: `Please enter new file name`,
+    value: baseFileName
+  }).then((newFileName) => {
+    if (newFileName === void 0) {
+      return;
+    } else if (newFileName === "") {
+      vscode.window.showErrorMessage(`Error: Blank file name not allowed`);
+      return;
+    } else if (newFileName === baseFileName || newFileName === baseFileNameWithoutExt) {
+      vscode.window.showErrorMessage(`Error: New file name cannot be same as old file name - ${newFileName}`);
+      newFileName = newFileName + "_copy";
+    } else {
+      if (!newFileName.includes(".")) {
+        newFileName = newFileName + baseFileExt;
+      }
+    }
+    const newFilePath = path.join(baseFileDir, newFileName);
+    fs.writeFileSync(newFilePath, baseFileContent);
+    vscode.workspace.openTextDocument(newFilePath).then((doc) => {
+      vscode.window.showTextDocument(doc);
+    });
+  });
+}
 function getTargetPath(sourcePath) {
   const dir = path.dirname(sourcePath);
   const ext = path.extname(sourcePath);
@@ -47,28 +78,43 @@ function getTargetPath(sourcePath) {
   let counter = 1;
   let targetPath;
   do {
-    targetPath = path.join(dir, `${base}_copy${counter}${ext}`);
+    targetPath = path.join(dir, `${base}_copy_${counter}${ext}`);
     counter++;
   } while (fs.existsSync(targetPath));
   return targetPath;
 }
 
 // src/extension.ts
-var fs2 = __toESM(require("fs"));
 function activate(context) {
-  console.log('Congratulations, your extension "copypastefile" is now active!');
-  let disposable = vscode2.commands.registerCommand("copypastefile.copyfile", (uri) => {
-    const sourcePath = uri.fsPath;
-    const targetPath = getTargetPath(sourcePath);
-    fs2.copyFile(sourcePath, targetPath, (err) => {
-      if (err) {
-        vscode2.window.showErrorMessage(`Failed to copy file: ${err.message}`);
-      } else {
-        vscode2.window.showInformationMessage(`File copied to ${targetPath}`);
-      }
-    });
+  vscode2.window.showInformationMessage("Copy Paste File extension is ready!");
+  const disposable = vscode2.commands.registerCommand("copypastefile.copyfile", async (uri) => {
+    if (!uri) {
+      vscode2.window.showErrorMessage("Please select a file first");
+      return;
+    }
+    try {
+      await copyFile(uri);
+    } catch (error) {
+      vscode2.window.showErrorMessage(`Error: ${error.message}`);
+    }
   });
   context.subscriptions.push(disposable);
+  const copypaste = vscode2.commands.registerCommand("copypastefile.copypaste", async (uri) => {
+    if (!uri) {
+      vscode2.window.showErrorMessage("Please select a file first");
+      return;
+    }
+    try {
+      const targetPath = getTargetPath(uri.fsPath);
+      const content = await vscode2.workspace.fs.readFile(uri);
+      await vscode2.workspace.fs.writeFile(vscode2.Uri.file(targetPath), content);
+      const doc = await vscode2.workspace.openTextDocument(vscode2.Uri.file(targetPath));
+      await vscode2.window.showTextDocument(doc);
+    } catch (error) {
+      vscode2.window.showErrorMessage(`Error: ${error.message}`);
+    }
+  });
+  context.subscriptions.push(copypaste);
 }
 function deactivate() {
 }
