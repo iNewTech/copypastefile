@@ -24,32 +24,32 @@
   "contributes": {
     "commands": [
       {
-        "command": "copypastefile.copyfile",
-        "title": "Copy Paste - Name"
+        "command": "copypastefile.duplicateFile",
+        "title": "Duplicate File"
       },
       {
-        "command": "copypastefile.copypaste",
-        "title": "Copy Paste"
+        "command": "copypastefile.copyFileContentToClipboard",
+        "title": "Copy File Content"
       }
     ],
     "menus": {
       "explorer/context": [
         {
-          "command": "copypastefile.copyfile",
+          "command": "copypastefile.duplicateFile",
           "group": "5_cutcopypaste"
         },
         {
-          "command": "copypastefile.copypaste",
+          "command": "copypastefile.copyFileContentToClipboard",
           "group": "5_cutcopypaste"
         }
       ],
       "editor/context": [
         {
-          "command": "copypastefile.copyfile",
+          "command": "copypastefile.duplicateFile",
           "group": "9_cutcopypaste"
         },
         {
-          "command": "copypastefile.copypaste",
+          "command": "copypastefile.copyFileContentToClipboard",
           "group": "9_cutcopypaste"
         }
       ]
@@ -81,6 +81,8 @@
     "npm-run-all": "^4.1.5",
     "typescript": "^5.6.3",
     "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.4.1"
+    "@vscode/test-electron": "^2.4.1",
+    "sinon": "^18.0.0",
+    "@types/sinon": "^17.0.3"
   }
 }
