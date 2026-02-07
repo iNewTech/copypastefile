@@ -2,7 +2,7 @@
   "name": "copypastefile",
   "displayName": "Copy Paste File",
   "description": "copy paste file to same location",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "publisher": "iNewTech",
   "icon": "images/icon.png",
   "author": {
@@ -20,7 +20,6 @@
     "Other"
   ],
   "main": "./dist/extension.js",
-  
   "contributes": {
     "commands": [
       {
