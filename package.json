@@ -80,7 +80,7 @@
     "test": "vscode-test",
     "vscpp": "vsce package && vsce publish",
     "pre-release": "npm run package",
-    "release": "vsce package -o release/ && cd release && vsce publish"
+    "release": "vsce package -o release/ && vsce publish"
   },
   "devDependencies": {
     "@types/vscode": "^1.95.0",
