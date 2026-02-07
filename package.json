@@ -2,7 +2,7 @@
   "name": "copypastefile",
   "displayName": "Copy Paste File",
   "description": "copy paste file to same location",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "publisher": "iNewTech",
   "icon": "images/icon.png",
   "author": {
