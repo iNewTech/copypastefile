@@ -40,53 +40,76 @@ var vscode3 = __toESM(require("vscode"));
 var vscode = __toESM(require("vscode"));
 var path = __toESM(require("path"));
 async function duplicateFile(uri) {
-  const baseFile = uri.fsPath;
-  const baseFileName = path.basename(baseFile);
-  const baseFileExt = path.extname(baseFileName);
-  const baseFileNameWithoutExt = path.basename(baseFile, path.extname(baseFile));
-  const baseFileDir = path.dirname(baseFile);
-  let counter = 0;
-  let newFileNameSuggestion;
-  while (true) {
-    if (counter === 0) {
-      newFileNameSuggestion = `${baseFileNameWithoutExt}_copy${baseFileExt}`;
+  if (!uri) {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+      uri = activeEditor.document.uri;
     } else {
-      newFileNameSuggestion = `${baseFileNameWithoutExt}_copy_${counter}${baseFileExt}`;
+      vscode.window.showErrorMessage("Please select a resource to duplicate.");
+      return;
     }
-    const newFilePath2 = path.join(baseFileDir, newFileNameSuggestion);
+  }
+  try {
+    const stat = await vscode.workspace.fs.stat(uri);
+    const isDirectory = (stat.type & vscode.FileType.Directory) !== 0;
+    const baseFileDir = path.dirname(uri.fsPath);
+    const baseName = path.basename(uri.fsPath);
+    const newNameSuggestion = await getUniqueName(baseFileDir, baseName);
+    const extIndex = newNameSuggestion.lastIndexOf(".");
+    const selectionEnd = extIndex > 0 ? extIndex : newNameSuggestion.length;
+    const newName = await vscode.window.showInputBox({
+      prompt: `Enter name for duplicated ${isDirectory ? "folder" : "file"}`,
+      value: newNameSuggestion,
+      valueSelection: [0, selectionEnd]
+    });
+    if (!newName) {
+      return;
+    }
+    const newFilePath = path.join(baseFileDir, newName);
+    const newUri = vscode.Uri.file(newFilePath);
     try {
-      await vscode.workspace.fs.stat(vscode.Uri.file(newFilePath2));
+      await vscode.workspace.fs.stat(newUri);
+      vscode.window.showErrorMessage(`${isDirectory ? "Folder" : "File"} already exists: ${newName}`);
+      return;
+    } catch {
+    }
+    await vscode.workspace.fs.copy(uri, newUri, { overwrite: false });
+    if (!isDirectory) {
+      const doc = await vscode.workspace.openTextDocument(newUri);
+      await vscode.window.showTextDocument(doc);
+    }
+  } catch (error) {
+    vscode.window.showErrorMessage(`Error duplicating resource: ${error.message}`);
+  }
+}
+async function getUniqueName(dirPath, oldName) {
+  const ext = path.extname(oldName);
+  const nameWithoutExt = path.basename(oldName, ext);
+  let counter = 0;
+  while (true) {
+    const suffix = counter === 0 ? "_copy" : `_copy_${counter}`;
+    const candidate = `${nameWithoutExt}${suffix}${ext}`;
+    const candidatePath = vscode.Uri.file(path.join(dirPath, candidate));
+    try {
+      await vscode.workspace.fs.stat(candidatePath);
       counter++;
     } catch {
-      break;
+      return candidate;
     }
-  }
-  const newFileName = await vscode.window.showInputBox({
-    prompt: `Please enter new file name`,
-    value: newFileNameSuggestion
-  });
-  if (newFileName === void 0 || newFileName === "") {
-    return;
-  }
-  const newFilePath = path.join(baseFileDir, newFileName);
-  try {
-    await vscode.workspace.fs.stat(vscode.Uri.file(newFilePath));
-    vscode.window.showErrorMessage(`File already exists: ${newFileName}`);
-    return;
-  } catch {
-  }
-  try {
-    const content = await vscode.workspace.fs.readFile(uri);
-    await vscode.workspace.fs.writeFile(vscode.Uri.file(newFilePath), content);
-    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(newFilePath));
-    await vscode.window.showTextDocument(doc);
-  } catch (error) {
-    vscode.window.showErrorMessage(`Error: ${error.message}`);
   }
 }
 
 // src/commands/copyFileContentToClipboard.ts
 var vscode2 = __toESM(require("vscode"));
+function isBinary(content) {
+  const checkLength = Math.min(content.length, 1024);
+  for (let i = 0; i < checkLength; i++) {
+    if (content[i] === 0) {
+      return true;
+    }
+  }
+  return false;
+}
 async function copyFileContentToClipboard(uri) {
   if (!uri) {
     vscode2.window.showErrorMessage("Please select a file first");
@@ -94,7 +117,12 @@ async function copyFileContentToClipboard(uri) {
   }
   try {
     const content = await vscode2.workspace.fs.readFile(uri);
-    await vscode2.env.clipboard.writeText(content.toString());
+    if (isBinary(content)) {
+      vscode2.window.showErrorMessage("Cannot copy binary file content to clipboard.");
+      return;
+    }
+    const text = new TextDecoder().decode(content);
+    await vscode2.env.clipboard.writeText(text);
     vscode2.window.showInformationMessage("File content copied to clipboard.");
   } catch (error) {
     vscode2.window.showErrorMessage(`Error: ${error.message}`);
@@ -103,9 +131,11 @@ async function copyFileContentToClipboard(uri) {
 
 // src/extension.ts
 function activate(context) {
-  vscode3.window.showInformationMessage("Copy Paste File extension is ready!");
   context.subscriptions.push(
     vscode3.commands.registerCommand("copypastefile.duplicateFile", duplicateFile)
+  );
+  context.subscriptions.push(
+    vscode3.commands.registerCommand("copypastefile.duplicateFolder", duplicateFile)
   );
   context.subscriptions.push(
     vscode3.commands.registerCommand("copypastefile.copyFileContentToClipboard", copyFileContentToClipboard)

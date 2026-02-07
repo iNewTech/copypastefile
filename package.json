@@ -28,6 +28,10 @@
         "title": "Duplicate File"
       },
       {
+        "command": "copypastefile.duplicateFolder",
+        "title": "Duplicate Folder"
+      },
+      {
         "command": "copypastefile.copyFileContentToClipboard",
         "title": "Copy File Content"
       }
@@ -36,11 +40,18 @@
       "explorer/context": [
         {
           "command": "copypastefile.duplicateFile",
-          "group": "5_cutcopypaste"
+          "group": "5_cutcopypaste",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "copypastefile.duplicateFolder",
+          "group": "5_cutcopypaste",
+          "when": "explorerResourceIsFolder"
         },
         {
           "command": "copypastefile.copyFileContentToClipboard",
-          "group": "5_cutcopypaste"
+          "group": "5_cutcopypaste",
+          "when": "!explorerResourceIsFolder"
         }
       ],
       "editor/context": [
@@ -68,7 +79,9 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vscode-test",
-    "vscpp": "vsce package && vsce publish"
+    "vscpp": "vsce package && vsce publish",
+    "pre-release": "npm run package",
+    "release": "vsce package -o release/ && cd release && vsce publish"
   },
   "devDependencies": {
     "@types/vscode": "^1.95.0",
