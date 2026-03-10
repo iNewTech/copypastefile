@@ -1,16 +1,5 @@
 import * as vscode from 'vscode';
-import * as util from 'util';
-
-function isBinary(content: Uint8Array): boolean {
-    // Check for null bytes in the first 1024 bytes
-    const checkLength = Math.min(content.length, 1024);
-    for (let i = 0; i < checkLength; i++) {
-        if (content[i] === 0) {
-            return true;
-        }
-    }
-    return false;
-}
+import { isBinary } from '../utils/fileUtils';
 
 export default async function copyFileContentToClipboard(uri: vscode.Uri) {
     if (!uri) {
@@ -20,7 +9,7 @@ export default async function copyFileContentToClipboard(uri: vscode.Uri) {
 
     try {
         const content = await vscode.workspace.fs.readFile(uri);
-        
+
         if (isBinary(content)) {
             vscode.window.showErrorMessage('Cannot copy binary file content to clipboard.');
             return;

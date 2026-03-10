@@ -33,6 +33,22 @@
       {
         "command": "copypastefile.copyFileContentToClipboard",
         "title": "Copy File Content"
+      },
+      {
+        "command": "copypastefile.copyMultipleFilesForAI",
+        "title": "Copy Files for AI Context"
+      },
+      {
+        "command": "copypastefile.copyOpenEditorsForAI",
+        "title": "Copy Open Editors for AI Context"
+      },
+      {
+        "command": "copypastefile.moveFileTo",
+        "title": "Move File To..."
+      },
+      {
+        "command": "copypastefile.copyFileTo",
+        "title": "Copy File To..."
       }
     ],
     "menus": {
@@ -51,6 +67,18 @@
           "command": "copypastefile.copyFileContentToClipboard",
           "group": "5_cutcopypaste",
           "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "copypastefile.copyMultipleFilesForAI",
+          "group": "5_cutcopypaste"
+        },
+        {
+          "command": "copypastefile.moveFileTo",
+          "group": "5_cutcopypaste"
+        },
+        {
+          "command": "copypastefile.copyFileTo",
+          "group": "5_cutcopypaste"
         }
       ],
       "editor/context": [
@@ -61,6 +89,20 @@
         {
           "command": "copypastefile.copyFileContentToClipboard",
           "group": "9_cutcopypaste"
+        },
+        {
+          "command": "copypastefile.moveFileTo",
+          "group": "9_cutcopypaste"
+        },
+        {
+          "command": "copypastefile.copyFileTo",
+          "group": "9_cutcopypaste"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "copypastefile.copyOpenEditorsForAI",
+          "group": "1_copypaste"
         }
       ]
     }
