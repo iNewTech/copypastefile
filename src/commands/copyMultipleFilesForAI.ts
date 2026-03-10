@@ -2,6 +2,19 @@ import * as vscode from 'vscode';
 import { isBinary, getLanguageId, getRelativePath, collectFilesRecursively } from '../utils/fileUtils';
 
 const MAX_FILE_SIZE = 512 * 1024; // 512 KB
+const FILE_CONTEXT_HEADER = '# File Context';
+
+function buildFileContextBlock(relativePaths: string[], contentSections: string[]): string {
+    const parts: string[] = [];
+    parts.push(`${FILE_CONTEXT_HEADER}\n`);
+    parts.push('## File Tree');
+    for (const rp of relativePaths) {
+        parts.push(`- ${rp}`);
+    }
+    parts.push('\n---\n');
+    parts.push(contentSections.join('\n'));
+    return parts.join('\n');
+}
 
 export default async function copyMultipleFilesForAI(
     uri: vscode.Uri,
@@ -37,17 +50,9 @@ export default async function copyMultipleFilesForAI(
             getRelativePath(a).localeCompare(getRelativePath(b))
         );
 
-        // Build file tree section
-        const relativePaths = allFileUris.map(u => getRelativePath(u));
-        const parts: string[] = [];
-        parts.push('# File Context\n');
-        parts.push('## File Tree');
-        for (const rp of relativePaths) {
-            parts.push(`- ${rp}`);
-        }
-        parts.push('\n---\n');
-
-        // Build content sections
+        // Build content sections for this batch
+        const relativePaths: string[] = [];
+        const contentSections: string[] = [];
         let copiedCount = 0;
         let skippedBinary = 0;
         let skippedLarge = 0;
@@ -58,8 +63,8 @@ export default async function copyMultipleFilesForAI(
 
             if (stat.size > MAX_FILE_SIZE) {
                 const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
-                parts.push(`## file: ${rp}`);
-                parts.push(`> [File too large: ${sizeMB} MB - skipped]\n`);
+                relativePaths.push(rp);
+                contentSections.push(`## file: ${rp}\n> [File too large: ${sizeMB} MB - skipped]\n`);
                 skippedLarge++;
                 continue;
             }
@@ -67,8 +72,8 @@ export default async function copyMultipleFilesForAI(
             const content = await vscode.workspace.fs.readFile(fileUri);
 
             if (isBinary(content)) {
-                parts.push(`## file: ${rp}`);
-                parts.push(`> [Binary file skipped]\n`);
+                relativePaths.push(rp);
+                contentSections.push(`## file: ${rp}\n> [Binary file skipped]\n`);
                 skippedBinary++;
                 continue;
             }
@@ -76,23 +81,35 @@ export default async function copyMultipleFilesForAI(
             const text = new TextDecoder().decode(content);
             const lang = getLanguageId(fileUri.fsPath);
 
-            parts.push(`## file: ${rp}`);
-            parts.push('```' + lang);
-            parts.push(text.endsWith('\n') ? text.slice(0, -1) : text);
-            parts.push('```\n');
+            relativePaths.push(rp);
+            const section = `## file: ${rp}\n\`\`\`${lang}\n${text.endsWith('\n') ? text.slice(0, -1) : text}\n\`\`\`\n`;
+            contentSections.push(section);
             copiedCount++;
         }
 
-        const output = parts.join('\n');
+        const newBlock = buildFileContextBlock(relativePaths, contentSections);
+
+        // Read existing clipboard and append if it already has file context blocks
+        const existing = await vscode.env.clipboard.readText();
+        let output: string;
+        if (existing.includes(FILE_CONTEXT_HEADER)) {
+            output = existing.trimEnd() + '\n' + newBlock;
+        } else {
+            output = newBlock;
+        }
+
         await vscode.env.clipboard.writeText(output);
 
         // Build summary message
-        const msgs: string[] = [`${copiedCount} file(s) copied for AI context.`];
+        const msgs: string[] = [`${copiedCount} file(s) added to AI context.`];
         if (skippedBinary > 0) {
             msgs.push(`${skippedBinary} binary file(s) skipped.`);
         }
         if (skippedLarge > 0) {
             msgs.push(`${skippedLarge} large file(s) skipped.`);
+        }
+        if (existing.includes(FILE_CONTEXT_HEADER)) {
+            msgs.push('(Appended to existing context)');
         }
         vscode.window.showInformationMessage(msgs.join(' '));
 
