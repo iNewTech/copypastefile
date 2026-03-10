@@ -231,6 +231,19 @@ async function copyFileContentToClipboard(uri) {
 // src/commands/copyMultipleFilesForAI.ts
 var vscode4 = __toESM(require("vscode"));
 var MAX_FILE_SIZE = 512 * 1024;
+var FILE_CONTEXT_HEADER = "# File Context";
+function buildFileContextBlock(relativePaths, contentSections) {
+  const parts = [];
+  parts.push(`${FILE_CONTEXT_HEADER}
+`);
+  parts.push("## File Tree");
+  for (const rp of relativePaths) {
+    parts.push(`- ${rp}`);
+  }
+  parts.push("\n---\n");
+  parts.push(contentSections.join("\n"));
+  return parts.join("\n");
+}
 async function copyMultipleFilesForAI(uri, selectedUris) {
   const uris = selectedUris && selectedUris.length > 0 ? selectedUris : uri ? [uri] : [];
   if (uris.length === 0) {
@@ -255,14 +268,8 @@ async function copyMultipleFilesForAI(uri, selectedUris) {
     allFileUris.sort(
       (a, b) => getRelativePath(a).localeCompare(getRelativePath(b))
     );
-    const relativePaths = allFileUris.map((u) => getRelativePath(u));
-    const parts = [];
-    parts.push("# File Context\n");
-    parts.push("## File Tree");
-    for (const rp of relativePaths) {
-      parts.push(`- ${rp}`);
-    }
-    parts.push("\n---\n");
+    const relativePaths = [];
+    const contentSections = [];
     let copiedCount = 0;
     let skippedBinary = 0;
     let skippedLarge = 0;
@@ -271,36 +278,51 @@ async function copyMultipleFilesForAI(uri, selectedUris) {
       const stat = await vscode4.workspace.fs.stat(fileUri);
       if (stat.size > MAX_FILE_SIZE) {
         const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
-        parts.push(`## file: ${rp}`);
-        parts.push(`> [File too large: ${sizeMB} MB - skipped]
+        relativePaths.push(rp);
+        contentSections.push(`## file: ${rp}
+> [File too large: ${sizeMB} MB - skipped]
 `);
         skippedLarge++;
         continue;
       }
       const content = await vscode4.workspace.fs.readFile(fileUri);
       if (isBinary(content)) {
-        parts.push(`## file: ${rp}`);
-        parts.push(`> [Binary file skipped]
+        relativePaths.push(rp);
+        contentSections.push(`## file: ${rp}
+> [Binary file skipped]
 `);
         skippedBinary++;
         continue;
       }
       const text = new TextDecoder().decode(content);
       const lang = getLanguageId(fileUri.fsPath);
-      parts.push(`## file: ${rp}`);
-      parts.push("```" + lang);
-      parts.push(text.endsWith("\n") ? text.slice(0, -1) : text);
-      parts.push("```\n");
+      relativePaths.push(rp);
+      const section = `## file: ${rp}
+\`\`\`${lang}
+${text.endsWith("\n") ? text.slice(0, -1) : text}
+\`\`\`
+`;
+      contentSections.push(section);
       copiedCount++;
     }
-    const output = parts.join("\n");
+    const newBlock = buildFileContextBlock(relativePaths, contentSections);
+    const existing = await vscode4.env.clipboard.readText();
+    let output;
+    if (existing.includes(FILE_CONTEXT_HEADER)) {
+      output = existing.trimEnd() + "\n" + newBlock;
+    } else {
+      output = newBlock;
+    }
     await vscode4.env.clipboard.writeText(output);
-    const msgs = [`${copiedCount} file(s) copied for AI context.`];
+    const msgs = [`${copiedCount} file(s) added to AI context.`];
     if (skippedBinary > 0) {
       msgs.push(`${skippedBinary} binary file(s) skipped.`);
     }
     if (skippedLarge > 0) {
       msgs.push(`${skippedLarge} large file(s) skipped.`);
+    }
+    if (existing.includes(FILE_CONTEXT_HEADER)) {
+      msgs.push("(Appended to existing context)");
     }
     vscode4.window.showInformationMessage(msgs.join(" "));
   } catch (error) {
