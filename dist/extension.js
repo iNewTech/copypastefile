@@ -34,7 +34,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode7 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 
 // src/commands/duplicateFile.ts
 var vscode = __toESM(require("vscode"));
@@ -230,20 +230,52 @@ async function copyFileContentToClipboard(uri) {
 
 // src/commands/copyMultipleFilesForAI.ts
 var vscode4 = __toESM(require("vscode"));
-var MAX_FILE_SIZE = 512 * 1024;
+
+// src/utils/aiContext.ts
 var FILE_CONTEXT_HEADER = "# File Context";
-function buildFileContextBlock(relativePaths, contentSections) {
+function trimTrailingNewline(text) {
+  return text.endsWith("\n") ? text.slice(0, -1) : text;
+}
+function buildAIContextBlock(relativePaths, contentSections, header = FILE_CONTEXT_HEADER) {
   const parts = [];
-  parts.push(`${FILE_CONTEXT_HEADER}
+  parts.push(`${header}
 `);
   parts.push("## File Tree");
-  for (const rp of relativePaths) {
-    parts.push(`- ${rp}`);
+  for (const relativePath of relativePaths) {
+    parts.push(`- ${relativePath}`);
   }
   parts.push("\n---\n");
   parts.push(contentSections.join("\n"));
   return parts.join("\n");
 }
+function buildFileContextSection(relativePath, text, language, descriptor) {
+  const heading = descriptor ? `## file: ${relativePath} (${descriptor})` : `## file: ${relativePath}`;
+  return `${heading}
+\`\`\`${language}
+${trimTrailingNewline(text)}
+\`\`\`
+`;
+}
+function buildSkippedFileContextSection(relativePath, message) {
+  return `## file: ${relativePath}
+> [${message}]
+`;
+}
+function appendAIContextBlock(existingClipboardText, newBlock, header = FILE_CONTEXT_HEADER) {
+  if (existingClipboardText.includes(header)) {
+    return {
+      output: existingClipboardText.trimEnd() + "\n" + newBlock,
+      appended: true
+    };
+  }
+  return {
+    output: newBlock,
+    appended: false
+  };
+}
+
+// src/commands/copyMultipleFilesForAI.ts
+var MAX_FILE_SIZE = 512 * 1024;
 async function copyMultipleFilesForAI(uri, selectedUris) {
   const uris = selectedUris && selectedUris.length > 0 ? selectedUris : uri ? [uri] : [];
   if (uris.length === 0) {
@@ -279,40 +311,29 @@ async function copyMultipleFilesForAI(uri, selectedUris) {
       if (stat.size > MAX_FILE_SIZE) {
         const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
         relativePaths.push(rp);
-        contentSections.push(`## file: ${rp}
-> [File too large: ${sizeMB} MB - skipped]
-`);
+        contentSections.push(
+          buildSkippedFileContextSection(rp, `File too large: ${sizeMB} MB - skipped`)
+        );
         skippedLarge++;
         continue;
       }
       const content = await vscode4.workspace.fs.readFile(fileUri);
       if (isBinary(content)) {
         relativePaths.push(rp);
-        contentSections.push(`## file: ${rp}
-> [Binary file skipped]
-`);
+        contentSections.push(buildSkippedFileContextSection(rp, "Binary file skipped"));
         skippedBinary++;
         continue;
       }
       const text = new TextDecoder().decode(content);
       const lang = getLanguageId(fileUri.fsPath);
       relativePaths.push(rp);
-      const section = `## file: ${rp}
-\`\`\`${lang}
-${text.endsWith("\n") ? text.slice(0, -1) : text}
-\`\`\`
-`;
+      const section = buildFileContextSection(rp, text, lang);
       contentSections.push(section);
       copiedCount++;
     }
-    const newBlock = buildFileContextBlock(relativePaths, contentSections);
+    const newBlock = buildAIContextBlock(relativePaths, contentSections);
     const existing = await vscode4.env.clipboard.readText();
-    let output;
-    if (existing.includes(FILE_CONTEXT_HEADER)) {
-      output = existing.trimEnd() + "\n" + newBlock;
-    } else {
-      output = newBlock;
-    }
+    const { output, appended } = appendAIContextBlock(existing, newBlock);
     await vscode4.env.clipboard.writeText(output);
     const msgs = [`${copiedCount} file(s) added to AI context.`];
     if (skippedBinary > 0) {
@@ -321,7 +342,7 @@ ${text.endsWith("\n") ? text.slice(0, -1) : text}
     if (skippedLarge > 0) {
       msgs.push(`${skippedLarge} large file(s) skipped.`);
     }
-    if (existing.includes(FILE_CONTEXT_HEADER)) {
+    if (appended) {
       msgs.push("(Appended to existing context)");
     }
     vscode4.window.showInformationMessage(msgs.join(" "));
@@ -344,25 +365,22 @@ async function copyOpenEditorsForAI() {
     const sorted = [...openDocs].sort(
       (a, b) => getRelativePath(a.uri).localeCompare(getRelativePath(b.uri))
     );
-    const parts = [];
-    parts.push("# File Context (Open Editors)\n");
-    parts.push("## File Tree");
-    for (const doc of sorted) {
-      parts.push(`- ${getRelativePath(doc.uri)}`);
-    }
-    parts.push("\n---\n");
+    const relativePaths = [];
+    const contentSections = [];
     let copiedCount = 0;
     for (const doc of sorted) {
       const rp = getRelativePath(doc.uri);
       const text = doc.getText();
       const lang = getLanguageId(doc.uri.fsPath);
-      parts.push(`## file: ${rp}`);
-      parts.push("```" + lang);
-      parts.push(text.endsWith("\n") ? text.slice(0, -1) : text);
-      parts.push("```\n");
+      relativePaths.push(rp);
+      contentSections.push(buildFileContextSection(rp, text, lang));
       copiedCount++;
     }
-    const output = parts.join("\n");
+    const output = buildAIContextBlock(
+      relativePaths,
+      contentSections,
+      "# File Context (Open Editors)"
+    );
     await vscode5.env.clipboard.writeText(output);
     vscode5.window.showInformationMessage(
       `${copiedCount} open editor(s) copied for AI context.`
@@ -372,8 +390,57 @@ async function copyOpenEditorsForAI() {
   }
 }
 
-// src/commands/moveOrCopyFileTo.ts
+// src/commands/copySelectionForAI.ts
 var vscode6 = __toESM(require("vscode"));
+function getDocumentLabel(document) {
+  if (document.uri.scheme === "file") {
+    return getRelativePath(document.uri);
+  }
+  return document.fileName || document.uri.toString();
+}
+function describeSelection(selection) {
+  const startLine = selection.start.line + 1;
+  const endLine = selection.end.character === 0 && selection.end.line > selection.start.line ? selection.end.line : selection.end.line + 1;
+  if (startLine === endLine) {
+    const startColumn = selection.start.character + 1;
+    const endColumn = selection.end.character;
+    return `selected line ${startLine}, cols ${startColumn}-${endColumn}`;
+  }
+  return `selected lines ${startLine}-${endLine}`;
+}
+async function copySelectionForAI(editor) {
+  const activeEditor = editor ?? vscode6.window.activeTextEditor;
+  if (!activeEditor) {
+    vscode6.window.showErrorMessage("Please open a text editor and select content first.");
+    return;
+  }
+  if (activeEditor.selection.isEmpty) {
+    vscode6.window.showErrorMessage("Please select some content first.");
+    return;
+  }
+  try {
+    const document = activeEditor.document;
+    const selectedText = document.getText(activeEditor.selection);
+    const relativePath = getDocumentLabel(document);
+    const language = getLanguageId(document.fileName || document.uri.fsPath);
+    const descriptor = describeSelection(activeEditor.selection);
+    const newBlock = buildAIContextBlock(
+      [relativePath],
+      [buildFileContextSection(relativePath, selectedText, language, descriptor)]
+    );
+    const existing = await vscode6.env.clipboard.readText();
+    const { output, appended } = appendAIContextBlock(existing, newBlock);
+    await vscode6.env.clipboard.writeText(output);
+    vscode6.window.showInformationMessage(
+      appended ? "Selected content copied for AI context. (Appended to existing context)" : "Selected content copied for AI context."
+    );
+  } catch (error) {
+    vscode6.window.showErrorMessage(`Error copying selection: ${error.message}`);
+  }
+}
+
+// src/commands/moveOrCopyFileTo.ts
+var vscode7 = __toESM(require("vscode"));
 var path3 = __toESM(require("path"));
 var SKIP_DIRS2 = /* @__PURE__ */ new Set([
   "node_modules",
@@ -401,13 +468,13 @@ async function collectFolders(rootUri, depth = 0) {
   const results = [];
   let entries;
   try {
-    entries = await vscode6.workspace.fs.readDirectory(rootUri);
+    entries = await vscode7.workspace.fs.readDirectory(rootUri);
   } catch {
     return results;
   }
   for (const [name, type] of entries) {
-    if (type === vscode6.FileType.Directory && !SKIP_DIRS2.has(name) && !name.startsWith(".")) {
-      const childUri = vscode6.Uri.joinPath(rootUri, name);
+    if (type === vscode7.FileType.Directory && !SKIP_DIRS2.has(name) && !name.startsWith(".")) {
+      const childUri = vscode7.Uri.joinPath(rootUri, name);
       results.push(childUri);
       const nested = await collectFolders(childUri, depth + 1);
       results.push(...nested);
@@ -423,23 +490,23 @@ function createCopyFileTo(context) {
 }
 async function moveOrCopyFileTo(uri, mode, context) {
   if (!uri) {
-    const activeEditor = vscode6.window.activeTextEditor;
+    const activeEditor = vscode7.window.activeTextEditor;
     if (activeEditor) {
       uri = activeEditor.document.uri;
     } else {
-      vscode6.window.showErrorMessage("Please select a file or folder first.");
+      vscode7.window.showErrorMessage("Please select a file or folder first.");
       return;
     }
   }
-  const workspaceFolders = vscode6.workspace.workspaceFolders;
+  const workspaceFolders = vscode7.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
-    vscode6.window.showErrorMessage("No workspace folder open.");
+    vscode7.window.showErrorMessage("No workspace folder open.");
     return;
   }
   try {
-    const folderUris = await vscode6.window.withProgress(
+    const folderUris = await vscode7.window.withProgress(
       {
-        location: vscode6.ProgressLocation.Notification,
+        location: vscode7.ProgressLocation.Notification,
         title: "Scanning workspace folders...",
         cancellable: false
       },
@@ -464,12 +531,12 @@ async function moveOrCopyFileTo(uri, mode, context) {
     if (recentPaths.length > 0) {
       items.push({
         label: "Recently Used",
-        kind: vscode6.QuickPickItemKind.Separator
+        kind: vscode7.QuickPickItemKind.Separator
       });
       for (const rp of recentPaths) {
-        const folderUri = vscode6.Uri.file(rp);
+        const folderUri = vscode7.Uri.file(rp);
         try {
-          await vscode6.workspace.fs.stat(folderUri);
+          await vscode7.workspace.fs.stat(folderUri);
           const label = getRelativeLabel(folderUri);
           items.push({
             label: `$(folder) ${label}`,
@@ -481,7 +548,7 @@ async function moveOrCopyFileTo(uri, mode, context) {
       }
       items.push({
         label: "All Folders",
-        kind: vscode6.QuickPickItemKind.Separator
+        kind: vscode7.QuickPickItemKind.Separator
       });
     }
     for (const folderUri of folderUris) {
@@ -493,7 +560,7 @@ async function moveOrCopyFileTo(uri, mode, context) {
     }
     const actionLabel = mode === "move" ? "Move" : "Copy";
     const baseName = path3.basename(uri.fsPath);
-    const picked = await vscode6.window.showQuickPick(items, {
+    const picked = await vscode7.window.showQuickPick(items, {
       placeHolder: `${actionLabel} "${baseName}" to...`,
       matchOnDescription: true
     });
@@ -502,25 +569,25 @@ async function moveOrCopyFileTo(uri, mode, context) {
     }
     let destinationFolderUri;
     if (picked.isCreateNew) {
-      const newPath = await vscode6.window.showInputBox({
+      const newPath = await vscode7.window.showInputBox({
         prompt: "Enter folder path (relative to workspace root)",
         placeHolder: "e.g., src/components/new-folder"
       });
       if (!newPath) {
         return;
       }
-      destinationFolderUri = vscode6.Uri.joinPath(workspaceFolders[0].uri, newPath);
-      await vscode6.workspace.fs.createDirectory(destinationFolderUri);
+      destinationFolderUri = vscode7.Uri.joinPath(workspaceFolders[0].uri, newPath);
+      await vscode7.workspace.fs.createDirectory(destinationFolderUri);
     } else if (picked.folderUri) {
       destinationFolderUri = picked.folderUri;
     } else {
       return;
     }
-    const destinationUri = vscode6.Uri.joinPath(destinationFolderUri, baseName);
+    const destinationUri = vscode7.Uri.joinPath(destinationFolderUri, baseName);
     let finalDestinationUri = destinationUri;
     try {
-      await vscode6.workspace.fs.stat(destinationUri);
-      const resolution = await vscode6.window.showQuickPick(
+      await vscode7.workspace.fs.stat(destinationUri);
+      const resolution = await vscode7.window.showQuickPick(
         [
           { label: "Overwrite", description: "Replace the existing file" },
           { label: "Auto-rename", description: "Save as a new name" },
@@ -538,30 +605,30 @@ async function moveOrCopyFileTo(uri, mode, context) {
     }
     const overwrite = finalDestinationUri.fsPath === destinationUri.fsPath;
     if (mode === "move") {
-      await vscode6.workspace.fs.rename(uri, finalDestinationUri, { overwrite });
+      await vscode7.workspace.fs.rename(uri, finalDestinationUri, { overwrite });
     } else {
-      await vscode6.workspace.fs.copy(uri, finalDestinationUri, { overwrite });
+      await vscode7.workspace.fs.copy(uri, finalDestinationUri, { overwrite });
     }
     const updatedRecent = [
       destinationFolderUri.fsPath,
       ...recentPaths.filter((p) => p !== destinationFolderUri.fsPath)
     ].slice(0, MAX_RECENT);
     await context.workspaceState.update(RECENT_KEY, updatedRecent);
-    const stat = await vscode6.workspace.fs.stat(finalDestinationUri);
-    const isDirectory = (stat.type & vscode6.FileType.Directory) !== 0;
-    vscode6.window.showInformationMessage(
+    const stat = await vscode7.workspace.fs.stat(finalDestinationUri);
+    const isDirectory = (stat.type & vscode7.FileType.Directory) !== 0;
+    vscode7.window.showInformationMessage(
       `${mode === "move" ? "Moved" : "Copied"} "${baseName}" to ${getRelativeLabel(destinationFolderUri)}`
     );
     if (!isDirectory) {
-      const doc = await vscode6.workspace.openTextDocument(finalDestinationUri);
-      await vscode6.window.showTextDocument(doc);
+      const doc = await vscode7.workspace.openTextDocument(finalDestinationUri);
+      await vscode7.window.showTextDocument(doc);
     }
   } catch (error) {
-    vscode6.window.showErrorMessage(`Error: ${error.message}`);
+    vscode7.window.showErrorMessage(`Error: ${error.message}`);
   }
 }
 function getRelativeLabel(folderUri) {
-  const wf = vscode6.workspace.getWorkspaceFolder(folderUri);
+  const wf = vscode7.workspace.getWorkspaceFolder(folderUri);
   if (wf) {
     const rel = path3.relative(wf.uri.fsPath, folderUri.fsPath);
     return rel || wf.name;
@@ -575,9 +642,9 @@ async function getUniqueDestination(folderUri, baseName) {
   while (true) {
     const suffix = counter === 0 ? "_copy" : `_copy_${counter}`;
     const candidate = `${nameWithoutExt}${suffix}${ext}`;
-    const candidateUri = vscode6.Uri.joinPath(folderUri, candidate);
+    const candidateUri = vscode7.Uri.joinPath(folderUri, candidate);
     try {
-      await vscode6.workspace.fs.stat(candidateUri);
+      await vscode7.workspace.fs.stat(candidateUri);
       counter++;
     } catch {
       return candidateUri;
@@ -588,25 +655,30 @@ async function getUniqueDestination(folderUri, baseName) {
 // src/extension.ts
 function activate(context) {
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.duplicateFile", duplicateFile)
+    vscode8.commands.registerCommand("copypastefile.duplicateFile", duplicateFile)
   );
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.duplicateFolder", duplicateFile)
+    vscode8.commands.registerCommand("copypastefile.duplicateFolder", duplicateFile)
   );
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.copyFileContentToClipboard", copyFileContentToClipboard)
+    vscode8.commands.registerCommand("copypastefile.copyFileContentToClipboard", copyFileContentToClipboard)
   );
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.copyMultipleFilesForAI", copyMultipleFilesForAI)
+    vscode8.commands.registerCommand("copypastefile.copyMultipleFilesForAI", copyMultipleFilesForAI)
   );
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.copyOpenEditorsForAI", copyOpenEditorsForAI)
+    vscode8.commands.registerCommand("copypastefile.copyOpenEditorsForAI", copyOpenEditorsForAI)
   );
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.moveFileTo", createMoveFileTo(context))
+    vscode8.commands.registerTextEditorCommand("copypastefile.copySelectionForAI", async (editor) => {
+      await copySelectionForAI(editor);
+    })
   );
   context.subscriptions.push(
-    vscode7.commands.registerCommand("copypastefile.copyFileTo", createCopyFileTo(context))
+    vscode8.commands.registerCommand("copypastefile.moveFileTo", createMoveFileTo(context))
+  );
+  context.subscriptions.push(
+    vscode8.commands.registerCommand("copypastefile.copyFileTo", createCopyFileTo(context))
   );
 }
 function deactivate() {

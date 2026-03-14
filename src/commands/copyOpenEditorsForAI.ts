@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { getLanguageId, getRelativePath } from '../utils/fileUtils';
+import { buildAIContextBlock, buildFileContextSection } from '../utils/aiContext';
 
 export default async function copyOpenEditorsForAI() {
     const openDocs = vscode.workspace.textDocuments.filter(doc =>
@@ -17,28 +18,24 @@ export default async function copyOpenEditorsForAI() {
             getRelativePath(a.uri).localeCompare(getRelativePath(b.uri))
         );
 
-        const parts: string[] = [];
-        parts.push('# File Context (Open Editors)\n');
-        parts.push('## File Tree');
-        for (const doc of sorted) {
-            parts.push(`- ${getRelativePath(doc.uri)}`);
-        }
-        parts.push('\n---\n');
-
+        const relativePaths: string[] = [];
+        const contentSections: string[] = [];
         let copiedCount = 0;
         for (const doc of sorted) {
             const rp = getRelativePath(doc.uri);
             const text = doc.getText();
             const lang = getLanguageId(doc.uri.fsPath);
 
-            parts.push(`## file: ${rp}`);
-            parts.push('```' + lang);
-            parts.push(text.endsWith('\n') ? text.slice(0, -1) : text);
-            parts.push('```\n');
+            relativePaths.push(rp);
+            contentSections.push(buildFileContextSection(rp, text, lang));
             copiedCount++;
         }
 
-        const output = parts.join('\n');
+        const output = buildAIContextBlock(
+            relativePaths,
+            contentSections,
+            '# File Context (Open Editors)'
+        );
         await vscode.env.clipboard.writeText(output);
         vscode.window.showInformationMessage(
             `${copiedCount} open editor(s) copied for AI context.`

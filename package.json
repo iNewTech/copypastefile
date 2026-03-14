@@ -43,6 +43,10 @@
         "title": "Copy Open Editors for AI Context"
       },
       {
+        "command": "copypastefile.copySelectionForAI",
+        "title": "Copy Content for AI"
+      },
+      {
         "command": "copypastefile.moveFileTo",
         "title": "Move File To..."
       },
@@ -89,6 +93,11 @@
         {
           "command": "copypastefile.copyFileContentToClipboard",
           "group": "9_cutcopypaste"
+        },
+        {
+          "command": "copypastefile.copySelectionForAI",
+          "group": "9_cutcopypaste",
+          "when": "editorHasSelection"
         },
         {
           "command": "copypastefile.moveFileTo",

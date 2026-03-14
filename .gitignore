@@ -47,3 +47,8 @@ ehthumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+.vscode/
+.vscode-test/
+out/
+dist/

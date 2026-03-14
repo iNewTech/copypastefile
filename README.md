@@ -25,6 +25,10 @@ Select one or more files or folders and copy them to the clipboard in AI-friendl
 
 Copies all currently open editor tabs to the clipboard in the same AI-friendly markdown format. Great for quickly sharing your working context with an AI assistant.
 
+### Copy Selected Content for AI
+
+Select any lines, paragraph, or snippet inside an editor and copy just that selection in AI-friendly markdown format. The clipboard output includes the file path, code fence language, and selected line range so the pasted context is clearly marked.
+
 ### Move File To... / Copy File To...
 
 Move or copy files and folders to any location in your workspace:
@@ -43,6 +47,8 @@ Right-click any file or folder in the Explorer sidebar to access all commands.
 ### Context Menu (Editor)
 
 Right-click inside an open editor for Duplicate File, Copy File Content, Move File To, and Copy File To.
+
+When text is selected, the same menu also shows **Copy Content for AI** to copy only the selected portion with AI context formatting.
 
 ### Editor Tab Context Menu
 

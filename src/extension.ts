@@ -3,6 +3,7 @@ import duplicateFile from './commands/duplicateFile';
 import copyFileContentToClipboard from './commands/copyFileContentToClipboard';
 import copyMultipleFilesForAI from './commands/copyMultipleFilesForAI';
 import copyOpenEditorsForAI from './commands/copyOpenEditorsForAI';
+import copySelectionForAI from './commands/copySelectionForAI';
 import { createMoveFileTo, createCopyFileTo } from './commands/moveOrCopyFileTo';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -25,6 +26,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('copypastefile.copyOpenEditorsForAI', copyOpenEditorsForAI)
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerTextEditorCommand('copypastefile.copySelectionForAI', async (editor) => {
+            await copySelectionForAI(editor);
+        })
     );
 
     context.subscriptions.push(

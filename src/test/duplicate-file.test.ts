@@ -1,11 +1,25 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import * as os from 'os';
 import * as path from 'path';
 import * as sinon from 'sinon';
 import duplicateFile from '../commands/duplicateFile';
 
 suite('Duplicate Resource Test Suite', () => {
-    const workspaceRoot = vscode.workspace.workspaceFolders![0].uri;
+    let testRootUri: vscode.Uri;
+
+    suiteSetup(async () => {
+        testRootUri = vscode.Uri.file(
+            path.join(os.tmpdir(), `copypastefile-duplicate-${Date.now()}`)
+        );
+        await vscode.workspace.fs.createDirectory(testRootUri);
+    });
+
+    suiteTeardown(async () => {
+        try {
+            await vscode.workspace.fs.delete(testRootUri, { recursive: true });
+        } catch {}
+    });
     
     // --- File Tests ---
     suite('File Duplication', () => {
@@ -14,7 +28,7 @@ suite('Duplicate Resource Test Suite', () => {
         let testFileUri: vscode.Uri;
 
         setup(async () => {
-            testFileUri = vscode.Uri.joinPath(workspaceRoot, testFileName);
+            testFileUri = vscode.Uri.joinPath(testRootUri, testFileName);
             await vscode.workspace.fs.writeFile(testFileUri, Buffer.from(testFileContent));
         });
 
@@ -31,7 +45,7 @@ suite('Duplicate Resource Test Suite', () => {
             try {
                 await duplicateFile(testFileUri);
 
-                const newFileUri = vscode.Uri.joinPath(workspaceRoot, newFileName);
+                const newFileUri = vscode.Uri.joinPath(testRootUri, newFileName);
                 const newFileContent = await vscode.workspace.fs.readFile(newFileUri);
                 assert.strictEqual(newFileContent.toString(), testFileContent);
                 
@@ -45,7 +59,7 @@ suite('Duplicate Resource Test Suite', () => {
         test('should suggest valid name if default exists', async () => {
             // Setup: Create "test_file_copy.txt" beforehand
             const existingCopyName = 'test_file_copy.txt';
-            const existingCopyUri = vscode.Uri.joinPath(workspaceRoot, existingCopyName);
+            const existingCopyUri = vscode.Uri.joinPath(testRootUri, existingCopyName);
             await vscode.workspace.fs.writeFile(existingCopyUri, Buffer.from('existing'));
 
             // Expectation: Suggest "test_file_copy_1.txt"
@@ -59,7 +73,7 @@ suite('Duplicate Resource Test Suite', () => {
             try {
                 await duplicateFile(testFileUri);
                 
-                const newFileUri = vscode.Uri.joinPath(workspaceRoot, expectedSuggestion);
+                const newFileUri = vscode.Uri.joinPath(testRootUri, expectedSuggestion);
                 const stat = await vscode.workspace.fs.stat(newFileUri);
                 assert.ok(stat, 'New file should exist');
 
@@ -79,7 +93,7 @@ suite('Duplicate Resource Test Suite', () => {
         let testFolderUri: vscode.Uri;
 
         setup(async () => {
-            testFolderUri = vscode.Uri.joinPath(workspaceRoot, testFolderName);
+            testFolderUri = vscode.Uri.joinPath(testRootUri, testFolderName);
             await vscode.workspace.fs.createDirectory(testFolderUri);
             
             // Create a file inside the folder to test recursion
@@ -100,7 +114,7 @@ suite('Duplicate Resource Test Suite', () => {
             try {
                 await duplicateFile(testFolderUri);
 
-                const newFolderUri = vscode.Uri.joinPath(workspaceRoot, newFolderName);
+                const newFolderUri = vscode.Uri.joinPath(testRootUri, newFolderName);
                 const newStat = await vscode.workspace.fs.stat(newFolderUri);
                 assert.strictEqual((newStat.type & vscode.FileType.Directory) !== 0, true, 'Should be a directory');
 
