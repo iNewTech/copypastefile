@@ -60,6 +60,12 @@ Open the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and search for any com
 
 ## Release Notes
 
+### 3.2.0
+
+- **New**: Copy Content for AI — right-click selected text in the editor to copy only that snippet in AI-ready markdown format
+- Selected AI snippets now include clear file and line markers for better pasted context
+- AI context formatting is now consistent across file, open-editor, and selected-content copy flows
+
 ### 3.1.0
 
 - **Copy Files for AI Context**: append-to-clipboard support — selecting more files adds to the existing AI context instead of replacing it

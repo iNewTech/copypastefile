@@ -2,6 +2,15 @@
 
 All notable changes to the "Copy Paste File" extension will be documented in this file.
 
+## [3.2.0] - 2026-03-14
+
+### Added
+- **Copy Content for AI** command for editor selections, allowing selected lines or snippets to be copied in AI-ready markdown format
+- File and line markers for selected-content AI context blocks
+
+### Improved
+- Consistent AI context formatting across file, open-editor, and selected-content copy commands
+
 ## [3.1.0] - 2026-03-12
 
 ### Added
